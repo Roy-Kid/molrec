@@ -10,6 +10,8 @@ It is the place for structure-like data:
 - per-bond arrays
 - per-angle arrays
 - per-dihedral arrays
+- volumetric grids (charge density, electrostatic potential, etc.)
+- the simulation cell (box)
 - other snapshot-resolved arrays tied to the canonical configuration
 
 `frame` is not restricted to atoms only.
@@ -48,11 +50,18 @@ frame
 |   |   +-- entity_kind: String[] = "dihedral"
 |   \-- (index: Integer[count][4])
 |   \-- ...
-\-- (fragments)
-|   \-- meta
-|   |   +-- count: Integer[]
-|   |   +-- entity_kind: String[] = "fragment"
-|   \-- ...
+\-- (grids)
+|   \-- <grid_name>
+|       +-- dim: Integer[3]
+|       +-- origin: Float[3]
+|       +-- cell: Float[3][3]
+|       +-- pbc: Bool[3]
+|       \-- <array_name>: Float[nx][ny][nz]
+|       \-- ...
+\-- (box)
+|   +-- vectors: Float[ndim][ndim]
+|   +-- (origin: Float[ndim])
+|   +-- (boundary: Bool[ndim])
 \-- ...
 ```
 
@@ -99,26 +108,40 @@ Examples:
 - angle equilibrium value
 - dihedral periodicity
 
+## Grids
+
+`frame` may contain named volumetric grids under `frame/grids/<name>`.
+
+A grid represents values on a uniform 3-D spatial domain. Each grid stores:
+
+- `dim`: grid dimensions `[nx, ny, nz]`
+- `origin`: Cartesian origin of the grid
+- `cell`: cell vectors defining the spatial extent (columns are lattice vectors)
+- `pbc`: periodic boundary flags for each axis
+- one or more named scalar arrays, each of shape `[nx][ny][nz]`
+
+Grid is a pure data structure. It carries no unit or description. When the same data appears in
+`observables`, the semantic metadata (unit, description, sampling, domain) belongs on the observable
+wrapper, not on the Grid itself.
+
 ## Box
 
-`box` is not part of `frame`.
+`box` is a property of each frame.
 
-It is stored as a root-level sibling:
+Each frame carries its own simulation cell:
 
 ```text
-box
-\-- meta
-|   +-- time_dependent: Bool[]
-\-- vectors: Float[ndim][ndim] | Float[ntimestep][ndim][ndim]
-\-- (origin: Float[ndim] | Float[ntimestep][ndim])
-\-- (boundary: String[ndim] | String[ntimestep][ndim])
+frame/box
++-- vectors: Float[ndim][ndim]       # cell vectors
++-- (origin: Float[ndim])            # cell origin
++-- (boundary: Bool[ndim])           # periodic boundary conditions
 ```
 
-If `box/meta/time_dependent = true`, every box array uses the shared trajectory timestep axis.
+For trajectory data, each frame stores its own box, naturally supporting both fixed-cell and
+variable-cell simulations.
 
 ## Interpretation
 
 `frame` should be read as:
 
-> the canonical stored snapshot of the system, including any static or snapshot-level collections that
-> belong with it.
+> the canonical stored snapshot of the system, including collections, grids, and the simulation cell.

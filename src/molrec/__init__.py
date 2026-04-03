@@ -1,0 +1,1 @@
+"""MolRec specification validation tests."""

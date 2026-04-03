@@ -6,10 +6,9 @@ MolRec defines the meaning of a molecular record.
 
 The central idea is simple:
 
-- `frame` stores a canonical snapshot or reference configuration as named collections
-- `box` stores static or trajectory-aligned cell information
+- `frame` stores a canonical snapshot as named collections, optional grids, and an optional box
 - `trajectory` stores a packed list of frame-like snapshots grouped by collection
-- `observables` stores arbitrary derived or reported data
+- `observables` stores arbitrary derived or reported data (scalar, vector, or grid)
 - `method` stores typed scientific context that explains how the record was produced
 - `meta` stores record-level metadata and audit information
 
@@ -26,7 +25,6 @@ A MolRec record is the complete logical object rooted at:
 /
 \-- meta
 \-- frame
-\-- (box)
 \-- (trajectory)
 \-- (observables)
 \-- (method)
@@ -49,15 +47,28 @@ record.
 
 ### Box
 
-`box` is a root-level sibling of `frame`.
+`box` is a property of each `frame`.
 
-It may be:
+Each frame carries its own simulation cell (cell vectors, origin, and periodic boundary conditions).
+For trajectory data, each frame stores its own box, naturally supporting both fixed-cell and
+variable-cell workflows.
 
-- static, with arrays such as `vectors[ndim][ndim]`
-- trajectory-aligned, with arrays such as `vectors[ntimestep][ndim][ndim]`
+### Grid
 
-This lets MolRec represent both fixed-cell and variable-cell workflows without nesting `box` under
-`frame`.
+`Grid` is a data structure for values on a uniform 3-D spatial grid.
+
+A grid is defined by:
+
+- `dim`: grid dimensions `[nx, ny, nz]`
+- `origin`: Cartesian origin
+- `cell`: cell vectors defining the spatial extent
+- `pbc`: periodic boundary flags
+- named scalar arrays, each of length `nx * ny * nz`
+
+Grid appears in two places:
+
+- **In frame**: as part of the canonical snapshot (e.g., charge density read from a file).
+- **In observables**: as `kind: "grid"`, carrying semantic metadata (description, unit, etc.).
 
 ### Trajectory
 
@@ -76,13 +87,11 @@ reads efficient and avoids metadata duplication while preserving frame-like sema
 
 An observable is any recorded quantity outside the core frame/trajectory definition.
 
-Examples:
+MolRec supports three observable data kinds:
 
-- total energy
-- stress tensor
-- electron density
-- RDF
-- per-step convergence value
+- **Scalar**: a single value or 1-D array (e.g., total energy, temperature)
+- **Vector**: an N-D array of components (e.g., dipole moment, stress tensor)
+- **Grid**: a volumetric field on a spatial grid (e.g., electron density, spin density)
 
 ### Method
 
@@ -102,6 +111,17 @@ Examples:
 If a snapshot needs per-bond, per-angle, or per-dihedral information, those arrays belong in
 `frame`, because they are part of the stored snapshot or reference structure.
 
+### Box lives on frame
+
+The simulation cell is a property of each frame, not a separate root-level concept. This simplifies
+the data model: every frame is self-contained with its own atoms, grids, and cell.
+
+### Grid is a data structure, not an observable kind
+
+Grid itself is a pure data container (dimensions, cell, arrays). It carries no unit or description.
+When a Grid appears in observables, the semantic metadata (unit, description, sampling, domain)
+lives on the `ObservableRecord` wrapper, not on the Grid object itself.
+
 ### Trajectories are collection-based, not atoms-only
 
 MolRec does not require trajectory data to be stored only as atom vectors.
@@ -120,7 +140,6 @@ Spatial dimension is inferred from array shapes such as:
 
 - `position[N][ndim]`
 - `box/vectors[ndim][ndim]`
-- `box/vectors[ntimestep][ndim][ndim]`
 - `trajectory/atoms/position[ntimestep][N][ndim]`
 
 ## Normative invariants
@@ -130,7 +149,7 @@ The following invariants define MolRec 0.1:
 1. Every record has exactly one canonical `frame`.
 2. `frame` contains zero or more named canonical collections, each with its own count and default
    entity order.
-3. `box` is parallel to `frame`, not nested inside it. `box` may be static or trajectory-aligned.
+3. `box` is a property of each frame, carrying cell vectors, origin, and boundary conditions.
 4. `trajectory` is interpreted as a list of frame-like snapshots packed into aligned arrays by
    collection.
 5. `trajectory` is not atoms-only. Any named collection may appear if its metadata defines axis and
