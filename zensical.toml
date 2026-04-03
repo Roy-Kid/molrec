@@ -1,0 +1,62 @@
+[project]
+site_name = "MolRec"
+site_description = "MolRec specification for developers"
+site_author = "Roy Kid"
+
+[project.theme]
+name = "modern"
+features = [
+    "navigation.tabs",
+    "navigation.top",
+    "navigation.instant",
+    "navigation.tracking",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.path",
+    "search.highlight",
+    "content.code.copy"
+]
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "blue"
+accent = "blue"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "blue"
+accent = "blue"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[markdown]
+extensions = [
+    "admonition",
+    "attr_list",
+    "md_in_html"
+]
+
+[markdown.toc]
+permalink = true
+
+[markdown.highlight]
+anchor_linenums = true
+
+[markdown.superfences]
+
+[plugins]
+search = {}
+
+[nav]
+Home = "index.md"
+
+[nav.Specification]
+Overview = "spec/overview.md"
+Meta = "spec/meta.md"
+Types = "spec/types.md"
+Frame = "spec/frame.md"
+Trajectory = "spec/trajectory.md"
+Observables = "spec/observables.md"
+Method = "spec/method.md"
