@@ -31,7 +31,7 @@ class TestReadCube:
     def test_atom_symbols(self, tests_data: Path):
         frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
         atoms = frame["atoms"]
-        syms = atoms.view("symbol")
+        syms = atoms.view("element")
         assert list(syms) == ["H", "H"]
 
     def test_no_simbox(self, tests_data: Path):
