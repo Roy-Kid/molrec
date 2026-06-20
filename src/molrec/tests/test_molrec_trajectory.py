@@ -16,7 +16,10 @@ class TestTrajectoryFromPDB:
         record = molrs.MolRec()
         record.set_frame(frame0)
         record.set_trajectory(trajectory)
-        record.method = {"type": "trajectory_import", "description": "synthetic pdb trajectory"}
+        record.method = {
+            "type": "trajectory_import",
+            "description": "synthetic pdb trajectory",
+        }
         record.write_zarr(str(tmp_zarr_path))
         loaded = molrs.MolRec.read_zarr(str(tmp_zarr_path))
 

@@ -3,6 +3,7 @@
 All tests use synthetic CHGCAR content generated in-memory so no external
 test-data files are required.
 """
+
 from __future__ import annotations
 
 import math
@@ -16,6 +17,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_chgcar(
     *,
@@ -95,6 +97,7 @@ def chgcar_spin_file(tmp_path: Path) -> Path:
 # TestReadCHGCAR
 # ---------------------------------------------------------------------------
 
+
 class TestReadCHGCAR:
     """Basic I/O tests for read_chgcar_file."""
 
@@ -129,6 +132,7 @@ class TestReadCHGCAR:
 # ---------------------------------------------------------------------------
 # TestCHGCARGrid
 # ---------------------------------------------------------------------------
+
 
 class TestCHGCARGrid:
     """Tests that the Grid embedded in the Frame is correct."""
@@ -176,6 +180,7 @@ class TestCHGCARGrid:
 # TestCHGCARSpin
 # ---------------------------------------------------------------------------
 
+
 class TestCHGCARSpin:
     """Tests for spin-polarised CHGCAR (ISPIN=2, total + diff)."""
 
@@ -200,6 +205,7 @@ class TestCHGCARSpin:
 # TestCHGCARAtomPositions
 # ---------------------------------------------------------------------------
 
+
 class TestCHGCARAtomPositions:
     """Verify atom coordinate conversion from Direct → Cartesian."""
 
@@ -218,7 +224,9 @@ class TestCHGCARAtomPositions:
         """BCC body-centre at Direct (0.5, 0.5, 0.5) with scale=2.87,
         orthogonal unit lattice → Cartesian (1.435, 1.435, 1.435)."""
         chgcar = _make_chgcar(scale=2.87)
-        import tempfile, os
+        import tempfile
+        import os
+
         with tempfile.NamedTemporaryFile(suffix="CHGCAR", mode="w", delete=False) as fh:
             fh.write(chgcar)
             name = fh.name
@@ -234,6 +242,7 @@ class TestCHGCARAtomPositions:
 # ---------------------------------------------------------------------------
 # TestCHGCARTriclinic
 # ---------------------------------------------------------------------------
+
 
 class TestCHGCARTriclinic:
     """Triclinic cell handling."""
@@ -253,7 +262,9 @@ class TestCHGCARTriclinic:
             counts=[1],
             positions=[(0.0, 0.0, 0.0)],
         )
-        import tempfile, os
+        import tempfile
+        import os
+
         with tempfile.NamedTemporaryFile(suffix="CHGCAR", mode="w", delete=False) as fh:
             fh.write(chgcar)
             name = fh.name
@@ -270,6 +281,7 @@ class TestCHGCARTriclinic:
 # ---------------------------------------------------------------------------
 # TestCHGCARRoundtrip (Grid → Zarr → reload)
 # ---------------------------------------------------------------------------
+
 
 class TestCHGCARGridZarrRoundtrip:
     """The Grid read from a CHGCAR survives a MolRec Zarr roundtrip."""
