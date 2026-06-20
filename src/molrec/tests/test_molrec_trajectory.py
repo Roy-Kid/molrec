@@ -11,7 +11,7 @@ class TestTrajectoryFromPDB:
         trajectory = molrs.Trajectory(
             [frame0, frame1],
             step=np.array([0, 1], dtype=np.int64),
-            time=np.array([0.0, 1.0], dtype=np.float32),
+            time=np.array([0.0, 1.0], dtype=np.float64),
         )
         record = molrs.MolRec()
         record.set_frame(frame0)
