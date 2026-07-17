@@ -2,14 +2,21 @@
 
 ## Purpose
 
-`metrics` stores append-oriented runtime measurements.
+`metrics` stores append-oriented runtime measurements. It is part of the **run
+surface** (with [Status](status.md) and [Method](method.md)) — see
+[Run surface](run.md).
+
+It is a recommended record section — a convention layered on the general model
+(see [Overview](overview.md)), not part of the core model.
 
 It is designed for training curves, validation scores, performance counters, diagnostics, and other
 run-local values that are useful while a record is being produced. The convention follows Molexp's
 run-local metrics stream while staying backend-neutral.
 
-Metrics are not the same as `observables`. Use `observables` for scientific quantities that are part
-of the interpreted record. Use `metrics` for monitoring and execution-local measurements.
+**Observables vs metrics.** Use [Observables](observables.md) for scientific
+quantities that are part of the *interpreted* record (e.g. a published RDF).
+Use `metrics` for run-local monitoring (loss, learning rate, wall time). Do not
+store training loss only under `observables` solely because it is numeric.
 
 ## Structure
 
