@@ -13,7 +13,6 @@ import molrs
 import numpy as np
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -214,8 +213,8 @@ class TestCHGCARAtomPositions:
         """BCC body-centre at Direct (0.5, 0.5, 0.5) with scale=2.87,
         orthogonal unit lattice → Cartesian (1.435, 1.435, 1.435)."""
         chgcar = _make_chgcar(scale=2.87)
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(suffix="CHGCAR", mode="w", delete=False) as fh:
             fh.write(chgcar)
@@ -252,8 +251,8 @@ class TestCHGCARTriclinic:
             counts=[1],
             positions=[(0.0, 0.0, 0.0)],
         )
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(suffix="CHGCAR", mode="w", delete=False) as fh:
             fh.write(chgcar)
