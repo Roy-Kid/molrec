@@ -75,7 +75,7 @@ sole version key is **`record_schema_version` (1)**. See
 | L1 Containers | Column · Block · Frame · Box |
 | L2 Record | Root sections and minimum shapes |
 | L3 Conventions | Domain section and field names |
-| L4 Backend binding | Reference: Zarr V3 in molrs (not a product name) |
+| L4 Backend binding | Arrays: Zarr V3 in molrs; metrics stream: JSONL (`metrics/metrics.jsonl`) |
 
 ## Key design principles
 
@@ -85,7 +85,7 @@ sole version key is **`record_schema_version` (1)**. See
 - **Run surface.** Training and jobs use `status` + `metrics` + `method` as one surface.
 - **Box only.** The cell contract name is `Box` / `box` — not `simbox`.
 - **One schema version.** `meta.record_schema_version` (starts at 1); no parallel `frame_schema_version`.
-- **molrs first.** Reference Zarr I/O lands in molrs; molpy re-exports — never a second layout named MolStore.
+- **molrs first.** Reference Zarr I/O for array sections lands in molrs; molpy re-exports — never a second layout named MolStore. Live **metrics** use JSONL append (`metrics/metrics.jsonl`), not Zarr.
 - **Hard cut.** New writers do not dual-read retired keys or private layouts; migrate offline.
 - **Collections, not only atoms.** Named blocks carry any entity set.
 - **Preserve the unknown.** Readers keep sections, blocks, and columns they do not interpret.

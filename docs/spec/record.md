@@ -82,13 +82,21 @@ that may embed Blocks without time-dependent coordinates.
 
 ## Backend binding (non-normative)
 
-The reference storage binding is **Zarr V3**, implemented in
+The reference storage binding for **array sections** (frame / trajectory /
+system / large observables) is **Zarr V3**, implemented in
 [molrs](https://github.com/MolCrafts/molrs). The specification does not require
 Zarr; any backend that preserves section semantics is conforming.
 
-Current molrs public Zarr helpers primarily persist **frame sequences**. A full
-record-root aggregate (all sections under one root) is a planned alignment with
-this chapter — not a second, parallel product name.
+**Metrics are different.** Append-oriented run measurements use a **JSONL**
+reference binding under `metrics/metrics.jsonl` (see [Metrics](metrics.md)).
+Do not use Zarr chunk append for the live metrics stream. A record root may be
+**hybrid**: Zarr groups for scientific arrays plus a filesystem JSONL metrics
+section (and small JSON files for `meta` / `status` / `method` when not stored
+as Zarr attributes).
+
+Current molrs public Zarr helpers primarily persist **frame sequences** and
+closed record aggregates. Live training metrics are written by higher layers
+(e.g. molnex provisional writer → later molpy) against the JSONL binding.
 
 ## See also
 

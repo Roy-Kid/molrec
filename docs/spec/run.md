@@ -64,9 +64,27 @@ This chapter does **not** replace the field tables in status / metrics /
 method. It indexes them as one surface:
 
 1. Write lifecycle with [Status](status.md).
-2. Append measurements with [Metrics](metrics.md).
+2. Append measurements with [Metrics](metrics.md) — **JSONL** live stream
+   (`metrics/metrics.jsonl`), not Zarr append.
 3. Describe the scientific setup with [Method](method.md).
 4. Place the package under the [Record](record.md) root.
+
+## Minimal filesystem Run package (reference)
+
+A non-Zarr Run-shaped package that tools can discover without a Zarr reader:
+
+```text
+<record-root>/
+├── meta/meta.json          # record_schema_version, creator, …
+├── status/status.json      # state (required when status exists), stage, …
+└── metrics/
+    ├── metrics.jsonl       # append-only stream (authoritative)
+    └── index.json          # optional derived
+```
+
+Producers (training frameworks, workflow runners) SHOULD write this shape so
+experiment UIs can match on `metrics/metrics.jsonl` and open the package as a
+MolRec Run without importing the producer.
 
 ## See also
 

@@ -27,7 +27,7 @@ data its authors never anticipated.
 | L1 | Containers | Column · Block · Frame · Box | Normative |
 | L2 | Record | Root sections, versioning, minimum shapes | Normative |
 | L3 | Conventions | `system`, `trajectory`, `status`, `metrics`, … | Recommended |
-| L4 | Backend binding | e.g. Zarr V3 reference layout in molrs | Reference only |
+| L4 | Backend binding | Arrays: Zarr V3 in molrs; metrics stream: JSONL | Reference only |
 
 ## The model (L1)
 

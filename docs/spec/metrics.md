@@ -45,7 +45,30 @@ metrics
 
 The logical fields are `type`, `key`, `step`, `wall_time`, `value`, and `tags`.
 
-A JSONL backend may use the compact Molexp field names:
+## JSONL reference binding (append path)
+
+The **authoritative on-disk binding for live metrics** is append-only **JSONL**,
+not Zarr. High-frequency writers (training steps, MD monitors) MUST append one
+JSON object per line. Chunked array stores (including Zarr) are a poor fit for
+per-step scalar append: they force chunk realignment, metadata churn, and make
+crash recovery harder than a line-oriented log.
+
+### Physical layout
+
+```text
+metrics/
+├── metrics.jsonl    # authoritative stream (one metric record per line)
+└── index.json       # optional, derived summary (rebuildable)
+```
+
+When the MolRec package is the openable record root, those paths are
+`<record-root>/metrics/metrics.jsonl` and `<record-root>/metrics/index.json`.
+A host that uses the record root as its run directory (e.g. molexp) may keep
+the same relative paths under the run dir.
+
+### Compact field names
+
+JSONL writers use the compact keys (shared with molexp):
 
 | Logical field | Compact field |
 |---------------|---------------|
@@ -55,6 +78,53 @@ A JSONL backend may use the compact Molexp field names:
 | `wall_time` | `w` |
 | `value` | `v` |
 | `tags` | `tags` |
+
+Example line:
+
+```json
+{"t":"scalar","k":"train/loss","s":120,"w":"2026-08-04T12:00:00","v":0.42}
+```
+
+Encoding rules:
+
+- UTF-8 text, one JSON object per line, terminated by `\n`
+- omit keys whose value would be JSON `null` (optional fields may be absent)
+- writers MUST NOT rewrite or delete historical lines
+- readers MUST skip blank lines; malformed lines SHOULD be counted and skipped
+- `metrics.jsonl` is the source of truth; `index.json` is never authoritative
+
+### Derived index
+
+`metrics/index.json` (when present) is a rebuildable summary. Recommended shape:
+
+```json
+{
+  "line_count": 3,
+  "series_count": 2,
+  "series": {
+    "train/loss": {
+      "type": "scalar",
+      "count": 2,
+      "latest_step": 2,
+      "latest_timestamp": "2026-08-04T12:00:01"
+    }
+  }
+}
+```
+
+Writers MAY rebuild the index on flush / close rather than on every append.
+
+### Relationship to Zarr / hybrid roots
+
+- **Live append** → JSONL under `metrics/` as above.
+- **Closed snapshot** (optional): a pure Zarr aggregate MAY store a small
+  metrics *summary* as group attributes for tooling that only opens Zarr.
+  That summary is not a substitute for the stream; consumers that need the
+  curve MUST read `metrics.jsonl` when it exists.
+- A single record root MAY be **hybrid**: frame / trajectory / large arrays in
+  Zarr groups, and `metrics/` as a filesystem JSONL sibling section.
+
+See [Record](record.md) (backend binding) and [Run surface](run.md).
 
 ## Metric records
 
