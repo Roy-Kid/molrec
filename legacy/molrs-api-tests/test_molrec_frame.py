@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import molrs
+import molrs.ff
+import molrs.io
 import numpy as np
 
 
 class TestFramePDB:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         record = molrs.MolRec()
         record.set_frame(frame)
         record.write_zarr(str(tmp_zarr_path))
@@ -17,7 +19,7 @@ class TestFramePDB:
         assert loaded.frame["atoms"].nrows == frame["atoms"].nrows
 
     def test_meta_and_method_preserved(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         record = molrs.MolRec()
         record.set_frame(frame)
         record.meta = {"version": [0, 2], "creator": {"name": "pytest"}}
@@ -34,7 +36,7 @@ class TestFramePDB:
 
 class TestScalarObservable:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         record = molrs.MolRec()
         record.set_frame(frame)
 
@@ -58,7 +60,7 @@ class TestScalarObservable:
 
 class TestVectorObservable:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         record = molrs.MolRec()
         record.set_frame(frame)
 
@@ -81,7 +83,7 @@ class TestGridInFrame:
     """Volumetric grids live as a Frame block: flat columns of nx*ny*nz rows."""
 
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         grid = molrs.Block()
         grid.insert("electron_density", np.full(4 * 4 * 4, 0.25, dtype=np.float32))
         grid.insert("spin_density", np.zeros(4 * 4 * 4, dtype=np.float32))
@@ -97,12 +99,10 @@ class TestGridInFrame:
         assert "electron_density" in loaded_grid.keys()
         assert "spin_density" in loaded_grid.keys()
         assert loaded_grid.view("electron_density").shape == (4 * 4 * 4,)
-        np.testing.assert_allclose(
-            loaded_grid.view("electron_density"), 0.25, atol=1e-5
-        )
+        np.testing.assert_allclose(loaded_grid.view("electron_density"), 0.25, atol=1e-5)
 
     def test_multi_array_grid(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         grid = molrs.Block()
         grid.insert("total", np.arange(2 * 3 * 4, dtype=np.float32))
         grid.insert("diff", np.zeros(2 * 3 * 4, dtype=np.float32))

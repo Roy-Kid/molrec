@@ -19,11 +19,11 @@ and metrics vocabulary.
 
 ## Section roles
 
-| Section | Role | Spec |
-|---------|------|------|
-| `method` | Scientific / training context | [Method](method.md) |
-| `status` | Lifecycle state, stage, progress, errors | [Status](status.md) |
-| `metrics` | Append-oriented run-local curves and counters | [Metrics](metrics.md) |
+| Section | Role | Spec | Physical (L4) |
+|---------|------|------|----------------|
+| `method` | Scientific / training context | [Method](method.md) | Zarr group attributes |
+| `status` | Lifecycle state, stage, progress, errors | [Status](status.md) | Zarr group attributes |
+| `metrics` | Append-oriented run-local curves and counters | [Metrics](metrics.md) | JSONL text buffer (+ optional Zarr summary) |
 
 ### Observables vs metrics
 
@@ -39,7 +39,7 @@ numeric. Do not put published scientific series only under `metrics`.
 A **Run**-shaped record requires:
 
 - `meta` (always)
-- `status` (with at least `status/state` when the section exists)
+- `status` (with at least `status.state` when the section exists)
 
 and SHOULD include at least one of:
 
@@ -55,7 +55,7 @@ the run also materializes structures or a defined chemical system.
 |----------|----------|
 | ML training job | `meta` + `method` + `status` + `metrics` |
 | MD production run monitor | `meta` + `method` + `status` + `metrics` + optional `trajectory` |
-| Failed job for resume | `meta` + `status` (+ `status/error`) + `method` |
+| Failed job for resume | `meta` + `status` (+ `status.error`) + `method` |
 | Eval pass | `meta` + `status` (stage=`eval`) + `metrics` + optional `observables` |
 
 ## Pointers into existing chapters
@@ -63,30 +63,35 @@ the run also materializes structures or a defined chemical system.
 This chapter does **not** replace the field tables in status / metrics /
 method. It indexes them as one surface:
 
-1. Write lifecycle with [Status](status.md).
-2. Append measurements with [Metrics](metrics.md) — **JSONL** live stream
-   (`metrics/metrics.jsonl`), not Zarr append.
-3. Describe the scientific setup with [Method](method.md).
-4. Place the package under the [Record](record.md) root.
+1. Write lifecycle with [Status](status.md) → Zarr `status/` attributes.
+2. Append measurements with [Metrics](metrics.md) → **JSONL buffer**
+   `metrics/metrics.jsonl` WAL, densified into Zarr series on flush (not
+   per-step Zarr chunk append).
+3. Describe the scientific setup with [Method](method.md) → Zarr `method/`
+   attributes.
+4. Place everything under one [Record](record.md) Zarr root ([Storage](storage.md)).
 
-## Minimal filesystem Run package (reference)
+## Minimal Run root (reference)
 
-A non-Zarr Run-shaped package that tools can discover without a Zarr reader:
+Still a **Zarr root** — not a loose tree of `.json` files:
 
 ```text
-<record-root>/
-├── meta/meta.json          # record_schema_version, creator, …
-├── status/status.json      # state (required when status exists), stage, …
+<record-root>/                 # Zarr V3
+├── meta/                      # attrs: record_schema_version, creator, …
+├── status/                    # attrs: state (required), stage, …
+├── method/                    # attrs: type, engine, …  (optional)
 └── metrics/
-    ├── metrics.jsonl       # append-only stream (authoritative)
-    └── index.json          # optional derived
+    ├── (attrs)                # catalog / closed summary
+    ├── series/…               # dense arrays after densify
+    └── metrics.jsonl          # live WAL when metrics exist
 ```
 
-Producers (training frameworks, workflow runners) SHOULD write this shape so
-experiment UIs can match on `metrics/metrics.jsonl` and open the package as a
-MolRec Run without importing the producer.
+Producers SHOULD write this shape so experiment UIs open one Zarr package and
+prefer dense series (tail the WAL only while live). Attribute payloads and
+the WAL golden: `fixtures/run-minimal/`.
 
 ## See also
 
 - [Record](record.md) — minimum shapes including Run
+- [Storage](storage.md) — Zarr root + metrics WAL
 - [Overview](overview.md)

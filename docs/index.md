@@ -48,12 +48,25 @@ No root `parameters/`. Minimum shapes: Structure, System-def, Trajectory
 is **Box**; sole version is **`record_schema_version`**. Details:
 [Record](spec/record.md), [Run surface](spec/run.md).
 
+## Storage (L4)
+
+One Zarr root; JSONL only as a metrics append buffer — full chapter:
+[Storage](spec/storage.md).
+
+| Form | Use |
+|------|-----|
+| Zarr V3 root | Whole package — array groups + document **group attributes** |
+| Dense Zarr series | Closed metrics curves under `metrics/` |
+| JSONL text WAL | Live metrics only: `metrics/metrics.jsonl` |
+
 ## Reading guide
 
 | Chapter | What it covers |
 |---------|----------------|
 | [Overview](spec/overview.md) | L0–L4, model, minimum records, invariants |
 | [Record](spec/record.md) | Root layout, versioning, section map |
+| [Storage](spec/storage.md) | Zarr root + metrics JSONL buffer |
+| [Meta](spec/meta.md) | Record-level metadata and schema version |
 | [Types](spec/types.md) | Column dtypes and structural shape |
 | [Frame](spec/frame.md) | Frame, Block, Column, Box |
 | [System](spec/system.md) | System definition vs frame state |
@@ -63,12 +76,12 @@ is **Box**; sole version is **`record_schema_version`**. Details:
 | [Observables](spec/observables.md) | Scientific result quantities |
 | [Status](spec/status.md) | Execution lifecycle |
 | [Metrics](spec/metrics.md) | Append-oriented measurements |
-| [Meta](spec/meta.md) | Record-level metadata |
 | [Method](spec/method.md) | Scientific context |
 
 ## Reference implementation
 
 [molrs](https://github.com/MolCrafts/molrs) provides the reference L1 containers
-and the Zarr V3 binding for frames (and, over time, full record roots). Consumers
-(molpy, molnex, molexp, …) adopt this contract; they must not invent a parallel
-store product name for the same layout.
+and the Zarr V3 binding for the record root (arrays + document attributes). The
+metrics JSONL buffer sits under that root ([Storage](spec/storage.md)).
+Consumers (molpy, molnex, molexp, …) adopt this contract; they must not invent a
+parallel store product name for the same layout.

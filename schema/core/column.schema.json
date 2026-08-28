@@ -1,0 +1,53 @@
+{
+  "description": "A typed N-dimensional array.\n\nThe leading axis length is the owning block's count; trailing axes are\nper-entity structure, so ``Float[count][3]`` is one column, not three.",
+  "properties": {
+    "dtype": {
+      "enum": [
+        "f16",
+        "f32",
+        "f64",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "bool",
+        "string",
+        "c64",
+        "c128"
+      ],
+      "title": "Dtype",
+      "type": "string"
+    },
+    "shape": {
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1,
+      "title": "Shape",
+      "type": "array"
+    },
+    "values": {
+      "anyOf": [
+        {
+          "items": {},
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Values"
+    }
+  },
+  "required": [
+    "dtype",
+    "shape"
+  ],
+  "title": "ColumnModel",
+  "type": "object"
+}

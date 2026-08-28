@@ -1,0 +1,158 @@
+"""Model comparison -- never byte comparison.
+
+Chunk size, codec, compression level, attribute key order and sharding are
+all legitimate implementation freedom: two conforming stores *should* differ
+at the byte level. So conformance is judged where the contract actually lives
+-- on the model a conforming reader reconstructs.
+
+The walk yields located violations rather than a bare ``False``, because
+someone fixing a file wants the whole list, not one round trip per field.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+from pydantic import BaseModel
+
+from molrec.arrays import arrays_equal
+from molrec.report import Violation
+
+
+def diff(expected: Any, actual: Any, path: str = "") -> tuple[Violation, ...]:
+    """Every way ``actual`` departs from ``expected``."""
+    if isinstance(expected, BaseModel):
+        return _diff_model(expected, actual, path)
+    if isinstance(expected, dict):
+        return _diff_mapping(expected, actual, path)
+    # An array on either side has to be routed here. An implementation that
+    # supplies a value where the model has none is as much a difference as one
+    # that drops a value, and `None == ndarray` is a ValueError rather than an
+    # answer.
+    if isinstance(expected, np.ndarray) or isinstance(actual, np.ndarray):
+        return _diff_array(expected, actual, path)
+    if isinstance(expected, (list, tuple)):
+        return _diff_sequence(expected, actual, path)
+    return _diff_scalar(expected, actual, path)
+
+
+def _at(path: str, key: Any) -> str:
+    return f"{path}/{key}" if path else f"/{key}"
+
+
+def _diff_model(expected: BaseModel, actual: Any, path: str) -> tuple[Violation, ...]:
+    found: list[Violation] = []
+    for name in type(expected).model_fields:
+        want = getattr(expected, name)
+        try:
+            got = getattr(actual, name)
+        except AttributeError:
+            if isinstance(actual, dict) and name in actual:
+                got = actual[name]
+            else:
+                found.append(Violation(kind="missing_field", path=_at(path, name), detail="absent"))
+                continue
+        found.extend(diff(want, got, _at(path, name)))
+    return tuple(found)
+
+
+def _diff_mapping(expected: dict, actual: Any, path: str) -> tuple[Violation, ...]:
+    if not isinstance(actual, dict):
+        return (
+            Violation(
+                kind="wrong_type",
+                path=path,
+                detail=f"expected a mapping, found {type(actual).__name__}",
+            ),
+        )
+
+    found: list[Violation] = []
+    for key, want in expected.items():
+        if key not in actual:
+            found.append(Violation(kind="missing_key", path=_at(path, key), detail="absent"))
+            continue
+        found.extend(diff(want, actual[key], _at(path, key)))
+
+    # Invariant 8 runs the other way too: an implementation must not invent
+    # content, and an unexpected key is as much a roundtrip failure as a lost
+    # one.
+    for key in actual:
+        if key not in expected:
+            found.append(
+                Violation(kind="unexpected_key", path=_at(path, key), detail="not in the model")
+            )
+    return tuple(found)
+
+
+def _diff_array(expected: Any, actual: Any, path: str) -> tuple[Violation, ...]:
+    if expected is None:
+        return (
+            Violation(
+                kind="unexpected_values",
+                path=path,
+                detail="the model carries nothing here",
+            ),
+        )
+    if actual is None:
+        return (Violation(kind="missing_values", path=path, detail="no array"),)
+    got = actual if isinstance(actual, np.ndarray) else np.asarray(actual)
+    if got.shape != expected.shape:
+        return (
+            Violation(
+                kind="wrong_shape",
+                path=path,
+                detail=f"expected {expected.shape}, found {got.shape}",
+            ),
+        )
+    if not arrays_equal(expected, got):
+        return (Violation(kind="value_mismatch", path=path, detail="array contents differ"),)
+    return ()
+
+
+def _equal(expected: Any, actual: Any) -> bool:
+    """Equality that survives whatever an adapter hands back.
+
+    A duck may return a numpy scalar, a masked value, or an object whose
+    ``__eq__`` raises. None of that is a reason for the harness to crash --
+    an answer it cannot compute is simply "not equal".
+    """
+    try:
+        return bool(expected == actual)
+    except (ValueError, TypeError):
+        return False
+
+
+def _diff_sequence(expected: Any, actual: Any, path: str) -> tuple[Violation, ...]:
+    if actual is None or isinstance(actual, (str, bytes)):
+        return (
+            Violation(
+                kind="wrong_type",
+                path=path,
+                detail=f"expected a sequence, found {type(actual).__name__}",
+            ),
+        )
+    got = list(actual)
+    want = list(expected)
+    if len(got) != len(want):
+        return (
+            Violation(
+                kind="wrong_length",
+                path=path,
+                detail=f"expected {len(want)}, found {len(got)}",
+            ),
+        )
+    found: list[Violation] = []
+    for index, (want_item, got_item) in enumerate(zip(want, got, strict=True)):
+        found.extend(diff(want_item, got_item, _at(path, index)))
+    return tuple(found)
+
+
+def _diff_scalar(expected: Any, actual: Any, path: str) -> tuple[Violation, ...]:
+    if _equal(expected, actual):
+        return ()
+    return (
+        Violation(
+            kind="value_mismatch", path=path, detail=f"expected {expected!r}, found {actual!r}"
+        ),
+    )

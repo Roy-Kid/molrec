@@ -2,60 +2,65 @@
 
 ## Purpose
 
-`status` stores execution state for a record. It is part of the **run surface**
-(with [Metrics](metrics.md) and [Method](method.md)) — see [Run surface](run.md).
+`status` stores **execution state** for a record. It is part of the **run
+surface** (with [Metrics](metrics.md) and [Method](method.md)) — see
+[Run surface](run.md).
 
-It is a recommended record section — a convention layered on the general model
-(see [Overview](overview.md)), not part of the core model.
+It is a recommended record section: a convention layered on the general model
+([Overview](overview.md)), not part of L0–L2.
 
-It is intended for monitoring, resume decisions, and UI summaries. It is not the place for
-scientific result arrays. Result arrays belong in `frame`, `trajectory`, `observables`, or
-`metrics`, depending on their semantics.
+Use it for monitoring, resume decisions, and UI summaries. It is **not** the
+place for scientific result arrays (those belong in `frame`, `trajectory`, or
+`observables`) or for time series of measurements (those belong in `metrics`).
 
-The convention follows the MolNex `TrainState` pattern: a small set of reserved progress keys plus
-namespaced extension fields.
+Physical form: **Zarr group attributes** on `status/` — see
+[Storage](storage.md). The logical document is one JSON object.
 
 ## Structure
 
 ```text
 status
-+-- state: String[]
-+-- (stage: String[])
-+-- (epoch: Integer[])
-+-- (global_step: Integer[])
-+-- (steps_since_last_eval: Integer[])
-+-- (message: String[])
-+-- (started_at: String[])
-+-- (updated_at: String[])
-+-- (finished_at: String[])
-+-- (progress)
-|   +-- ...
-+-- (history)
-|   \-- <event_id>
-|       +-- state: String[]
-|       +-- (stage: String[])
-|       +-- timestamp: String[]
-|       +-- (message: String[])
++-- state: string                     # required when status exists
++-- (stage: string)
++-- (epoch: number)
++-- (global_step: number)
++-- (steps_since_last_eval: number)
++-- (message: string)
++-- (started_at: string)              # ISO-8601
++-- (updated_at: string)
++-- (finished_at: string)
++-- (progress)                        # object — extra counters
+|   \-- ...
++-- (history)                         # array of events, or object keyed by id
+|   \-- <event>
+|       +-- state: string
+|       +-- timestamp: string
+|       +-- (stage: string)
+|       +-- (message: string)
 |       \-- ...
-+-- (tasks)
++-- (tasks)                           # object keyed by task_id
 |   \-- <task_id>
-|       +-- state: String[]
-|       +-- (stage: String[])
+|       +-- state: string
+|       +-- (stage: string)
 |       +-- (progress)
+|       +-- (message: string)
 |       \-- ...
 +-- (error)
-|   +-- type: String[]
-|   +-- message: String[]
-|   +-- (timestamp: String[])
+|   +-- type: string
+|   +-- message: string
+|   +-- (timestamp: string)
 |   \-- ...
-+-- ...
+\-- ...                               # producer extensions
 ```
 
-`status/state` is required whenever `status` exists.
+Field types are plain JSON. Writers SHOULD keep the object small (current
+snapshot); long series go in `metrics`.
+
+`status.state` is **required** whenever the `status` section exists.
 
 ## Lifecycle states
 
-MolRec recommends the following lowercase lifecycle vocabulary:
+Lowercase vocabulary:
 
 | State | Meaning |
 |-------|---------|
@@ -63,83 +68,79 @@ MolRec recommends the following lowercase lifecycle vocabulary:
 | `running` | Currently executing |
 | `succeeded` | Finished successfully |
 | `failed` | Finished with an error |
-| `cancelled` | Stopped by user or scheduler request |
+| `cancelled` | Stopped by user or scheduler |
 | `skipped` | Intentionally not executed |
 
-Writers may preserve custom states, but readers should treat unknown states as terminal only if a
-module specification declares them terminal.
+Writers may preserve custom states. Readers should treat unknown states as
+terminal only if a module specification declares them terminal.
 
 ## Stages
 
-`status/stage` describes the current execution phase, independent of lifecycle state.
+`status.stage` describes the current execution phase, independent of lifecycle
+state.
 
-MolRec reserves the MolNex stage vocabulary:
+Reserved MolNex stage vocabulary: `train`, `eval`, `test`, `predict`.
 
-- `train`
-- `eval`
-- `test`
-- `predict`
-
-Additional stages such as `prepare`, `simulate`, `relax`, or `analyze` are valid when they are
+Additional stages (`prepare`, `simulate`, `relax`, `analyze`, …) are valid when
 documented by `method` or a declared module.
 
 ## Progress keys
 
-`status` stores small counters needed for monitoring and resume decisions.
+Reserved counters live directly under `status`:
 
-The reserved MolNex-compatible keys live directly under `status`:
+| Key | Meaning |
+|-----|---------|
+| `epoch` | Current epoch index (zero-based when training semantics apply) |
+| `global_step` | Monotonically increasing step across the run |
+| `steps_since_last_eval` | Steps since the last evaluation pass |
 
-- `epoch`: current epoch index, zero-based when training semantics apply
-- `global_step`: monotonically increasing step counter across the run
-- `steps_since_last_eval`: step counter since the last evaluation pass
-
-Writers may add more counters under `status/progress`, but they should use clear names and avoid
-reusing the reserved keys with different meanings.
+Extra counters go under `status.progress` with clear names; do not reuse
+reserved keys with different meanings.
 
 ## History
 
-`status/history` is an optional ordered event log.
+Optional ordered event log. Each event SHOULD include `state` and `timestamp`,
+and MAY include `stage`, `message`, and producer-specific fields.
 
-Each event should include:
-
-- `state`
-- `timestamp`
-
-Each event may include:
-
-- `stage`
-- `message`
-- producer-specific fields
-
-History is append-oriented. Updating the current `status/state` does not require rewriting previous
-events.
+History is append-oriented. Updating the current `status.state` does not require
+rewriting previous events.
 
 ## Task status
 
-`status/tasks/<task_id>` stores per-task or per-stage state when a record comes from a workflow.
-
-Task IDs should match identifiers used in `method/stages`, workflow assets, or the producing
-engine. A task status has the same basic fields as the root status:
-
-- `state`
-- optional `stage`
-- optional `progress`
-- optional `message`
+`status.tasks.<task_id>` holds per-task or per-stage state for workflows. Task
+IDs SHOULD match identifiers in `method.stages`, workflow assets, or the
+producing engine. Each task entry uses the same basic fields as root status
+(`state`, optional `stage` / `progress` / `message`).
 
 ## Relationship to metrics
 
-Status fields are a compact current-state snapshot. Metrics are an append-oriented measurement
-stream.
+| Section | Role |
+|---------|------|
+| `status` | compact **current** lifecycle and progress |
+| `metrics` | append-oriented measurements over time |
 
 Examples:
 
-- `status/global_step = 4000` says where execution is now.
-- `metrics` records `train/loss` at many steps.
-- `status/state = "failed"` says the run failed.
-- `status/error/message` stores the current error summary.
+- `status.global_step = 4000` — where execution is now
+- `metrics` records `train/loss` at many steps
+- `status.state = "failed"` and `status.error.message` — current failure summary
+
+## Example
+
+Attribute object on the `status/` Zarr group (golden:
+`fixtures/run-minimal/attrs/status.json`):
+
+```json
+{
+  "state": "succeeded",
+  "stage": "train",
+  "global_step": 2,
+  "started_at": "2026-08-04T00:00:00+00:00",
+  "finished_at": "2026-08-04T00:00:02+00:00"
+}
+```
 
 ## Rule
 
-The core rule is:
-
-> `status` records lifecycle and progress state; measurements over time belong in `metrics`.
+> `status` records lifecycle and progress state; measurements over time belong
+> in `metrics`.

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import molrs
+import molrs.ff
+import molrs.io
 
 
 class TestStaticBox:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "1vln-triclinic.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "1vln-triclinic.pdb"))
         record = molrs.MolRec()
         record.set_frame(frame)
         record.write_zarr(str(tmp_zarr_path))
@@ -14,7 +16,7 @@ class TestStaticBox:
         assert loaded.frame.box is not None
 
     def test_simbox_cell_preserved(self, tests_data, tmp_zarr_path):
-        frame = molrs.read_pdb(str(tests_data / "pdb" / "1vln-triclinic.pdb"))
+        frame = molrs.io.read_pdb(str(tests_data / "pdb" / "1vln-triclinic.pdb"))
         original_simbox = frame.box
         record = molrs.MolRec()
         record.set_frame(frame)
@@ -31,9 +33,7 @@ class TestNoBoxTrajectory:
 
     def test_roundtrip(self, tests_data, tmp_zarr_path):
         # LAMMPS dumps include BOX BOUNDS, so a box is parsed and stored.
-        frames = molrs.read_lammps_traj(
-            str(tests_data / "lammps" / "wrapped.lammpstrj")
-        )
+        frames = molrs.io.read_lammps_trajectory(str(tests_data / "lammps" / "wrapped.lammpstrj"))
         record = molrs.MolRec()
         record.set_frame(frames[0])
         for frame in frames:

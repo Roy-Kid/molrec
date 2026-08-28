@@ -1,0 +1,53 @@
+{
+  "additionalProperties": true,
+  "description": "The record's identity document.\n\n``extra=\"allow\"`` is not convenience -- it is the preserve-the-unknown\ninvariant: a reader must keep keys it does not recognize.",
+  "properties": {
+    "content_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Content Hash"
+    },
+    "format_name": {
+      "anyOf": [
+        {
+          "const": "molrec",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Format Name"
+    },
+    "record_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Record Id"
+    },
+    "record_schema_version": {
+      "minimum": 1,
+      "title": "Record Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "record_schema_version"
+  ],
+  "title": "MetaModel",
+  "type": "object"
+}

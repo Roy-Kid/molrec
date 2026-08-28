@@ -75,7 +75,7 @@ sole version key is **`record_schema_version` (1)**. See
 | L1 Containers | Column · Block · Frame · Box |
 | L2 Record | Root sections and minimum shapes |
 | L3 Conventions | Domain section and field names |
-| L4 Backend binding | Arrays: Zarr V3 in molrs; metrics stream: JSONL (`metrics/metrics.jsonl`) |
+| L4 Backend binding | One Zarr root (arrays + document attrs) · metrics JSONL buffer ([storage](docs/spec/storage.md)) |
 
 ## Key design principles
 
@@ -84,12 +84,12 @@ sole version key is **`record_schema_version` (1)**. See
 - **System ≠ state.** `system/` defines the system; coordinates live on `frame` / `trajectory`.
 - **Run surface.** Training and jobs use `status` + `metrics` + `method` as one surface.
 - **Box only.** The cell contract name is `Box` / `box` — not `simbox`.
-- **One schema version.** `meta.record_schema_version` (starts at 1); no parallel `frame_schema_version`.
-- **molrs first.** Reference Zarr I/O for array sections lands in molrs; molpy re-exports — never a second layout named MolStore. Live **metrics** use JSONL append (`metrics/metrics.jsonl`), not Zarr.
+- **One schema version.** `meta.record_schema_version` (starts at 1); no parallel `frame_schema_version` or layout `meta.version`.
+- **Zarr + metrics WAL.** One Zarr V3 root holds arrays and document sections (group attributes). Closed metrics densify to Zarr series; live metrics use an append-only JSONL WAL (`metrics/metrics.jsonl`) — not a parallel `.json` document tree. Never a second layout named MolStore.
 - **Hard cut.** New writers do not dual-read retired keys or private layouts; migrate offline.
 - **Collections, not only atoms.** Named blocks carry any entity set.
 - **Preserve the unknown.** Readers keep sections, blocks, and columns they do not interpret.
-- **Backend-neutral.** Semantics do not require Zarr; Zarr V3 is the reference binding only.
+- **Backend-neutral.** Semantics do not require Zarr; the Zarr root + JSONL buffer is the reference binding only.
 
 ## Documentation
 

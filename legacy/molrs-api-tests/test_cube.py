@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import molrs
+import molrs.ff
+import molrs.io
 import numpy as np
 import pytest
 
@@ -24,37 +26,37 @@ class TestReadCube:
     """Basic I/O tests for read_cube_file."""
 
     def test_returns_frame(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         assert type(frame).__name__ == "Frame"
         assert "atoms" in frame and "grid" in frame
 
     def test_atoms_block_present(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         assert "atoms" in frame
         assert frame["atoms"].nrows == 2
 
     def test_atom_symbols(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         atoms = frame["atoms"]
         syms = atoms.view("element")
         assert list(syms) == ["H", "H"]
 
     def test_simbox_present(self, tests_data: Path):
         """Cube files carry voxel axis vectors, exposed as the Frame's box."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
-        assert frame.simbox is not None
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
+        assert frame.box is not None
 
     def test_units_in_meta(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
-        assert frame.meta.get("cube_units") == "bohr"
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
+        assert frame.meta.get("cube_units").value == "bohr"
 
     def test_angstrom_units(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20ang.cube"))
-        assert frame.meta.get("cube_units") == "angstrom"
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20ang.cube"))
+        assert frame.meta.get("cube_units").value == "angstrom"
 
     def test_missing_file_raises(self, tmp_path: Path):
         with pytest.raises(Exception):
-            molrs.read_cube_file(str(tmp_path / "nonexistent.cube"))
+            molrs.io.read_cube(str(tmp_path / "nonexistent.cube"))
 
 
 # ---------------------------------------------------------------------------
@@ -66,31 +68,31 @@ class TestCubeGrid:
     """Tests that the volumetric grid block on the Frame is correct."""
 
     def test_grid_key_exists(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         assert "grid" in frame
 
     def test_grid_npoints_valtest(self, tests_data: Path):
         """valtest grid is 1x1x5 = 5 points (one flat row per voxel)."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         assert frame["grid"].nrows == 5
 
     def test_grid_npoints_grid20(self, tests_data: Path):
         """grid20 grid is 20x20x20 = 8000 points."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
         assert frame["grid"].nrows == 20 * 20 * 20
 
     def test_density_array_present(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
         assert "density" in frame["grid"].keys()
 
     def test_density_array_shape(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
         density = frame["grid"].view("density")
         assert density.shape == (20 * 20 * 20,)
 
     def test_valtest_known_values(self, tests_data: Path):
         """Check known data values from valtest.cube."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
         density = frame["grid"].view("density")
         # From file: -1.00000E+02 -1.00000E-02 0 1.00000E-02 1.00000E+02
         np.testing.assert_allclose(density[0], -100.0, atol=1e-5)
@@ -107,7 +109,7 @@ class TestCubeMO:
 
     def test_mo_grid_keys(self, tests_data: Path):
         """grid20mo6-8.cube has 3 orbitals: mo_6, mo_7, mo_8."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20mo6-8.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20mo6-8.cube"))
         cols = frame["grid"].keys()
         assert "mo_6" in cols
         assert "mo_7" in cols
@@ -115,23 +117,23 @@ class TestCubeMO:
         assert "density" not in cols
 
     def test_mo_indices_meta(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20mo6-8.cube"))
-        assert frame.meta.get("cube_mo_indices") == "6,7,8"
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20mo6-8.cube"))
+        assert frame.meta.get("cube_mo_indices").value == "6,7,8"
 
     def test_mo_array_shape(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20mo6-8.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20mo6-8.cube"))
         assert frame["grid"].view("mo_6").shape == (20 * 20 * 20,)
 
     def test_single_mo(self, tests_data: Path):
         """grid25mo.cube has 1 orbital: mo_5."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid25mo.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid25mo.cube"))
         grid = frame["grid"]
         assert "mo_5" in grid.keys()
         assert grid.view("mo_5").shape == (25 * 25 * 25,)
-        assert frame.meta.get("cube_mo_indices") == "5"
+        assert frame.meta.get("cube_mo_indices").value == "5"
 
     def test_mo_atom_count(self, tests_data: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20mo6-8.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20mo6-8.cube"))
         assert frame["atoms"].nrows == 7
 
 
@@ -147,9 +149,9 @@ class TestCubeWriteRoundtrip:
         path_in = str(tests_data / "cube" / "valtest.cube")
         path_out = str(tmp_path / "valtest_rt.cube")
 
-        frame1 = molrs.read_cube_file(path_in)
-        molrs.write_cube_file(path_out, frame1)
-        frame2 = molrs.read_cube_file(path_out)
+        frame1 = molrs.io.read_cube(path_in)
+        molrs.io.write_cube(path_out, frame1)
+        frame2 = molrs.io.read_cube(path_out)
 
         assert frame2["atoms"].nrows == frame1["atoms"].nrows
         assert frame2["grid"].nrows == frame1["grid"].nrows
@@ -162,9 +164,9 @@ class TestCubeWriteRoundtrip:
         path_in = str(tests_data / "cube" / "grid20.cube")
         path_out = str(tmp_path / "grid20_rt.cube")
 
-        frame1 = molrs.read_cube_file(path_in)
-        molrs.write_cube_file(path_out, frame1)
-        frame2 = molrs.read_cube_file(path_out)
+        frame1 = molrs.io.read_cube(path_in)
+        molrs.io.write_cube(path_out, frame1)
+        frame2 = molrs.io.read_cube(path_out)
 
         assert frame2["atoms"].nrows == 16
         assert frame2["grid"].nrows == 20 * 20 * 20
@@ -183,7 +185,7 @@ class TestCubeZarrRoundtrip:
     """The grid block read from a cube file survives a MolRec Zarr roundtrip."""
 
     def test_density_roundtrip(self, tests_data: Path, tmp_zarr_path: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "valtest.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "valtest.cube"))
 
         record = molrs.MolRec()
         record.set_frame(frame)
@@ -199,7 +201,7 @@ class TestCubeZarrRoundtrip:
         np.testing.assert_allclose(d_loaded, d_orig, atol=1e-10)
 
     def test_grid20_roundtrip(self, tests_data: Path, tmp_zarr_path: Path):
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
 
         record = molrs.MolRec()
         record.set_frame(frame)
@@ -213,7 +215,7 @@ class TestCubeZarrRoundtrip:
 
     def test_mo_roundtrip(self, tests_data: Path, tmp_zarr_path: Path):
         """MO cube grids (multiple arrays) survive Zarr roundtrip."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20mo6-8.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20mo6-8.cube"))
 
         record = molrs.MolRec()
         record.set_frame(frame)
@@ -235,7 +237,7 @@ class TestCubeZarrRoundtrip:
 
     def test_atoms_preserved(self, tests_data: Path, tmp_zarr_path: Path):
         """Atoms block survives the Zarr roundtrip."""
-        frame = molrs.read_cube_file(str(tests_data / "cube" / "grid20.cube"))
+        frame = molrs.io.read_cube(str(tests_data / "cube" / "grid20.cube"))
 
         record = molrs.MolRec()
         record.set_frame(frame)

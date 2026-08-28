@@ -2,76 +2,103 @@
 
 ## Purpose
 
-`metrics` stores append-oriented runtime measurements. It is part of the **run
-surface** (with [Status](status.md) and [Method](method.md)) — see
-[Run surface](run.md).
+`metrics` stores **run-local** measurements (training curves, validation
+scores, performance counters). It is part of the **run surface** (with
+[Status](status.md) and [Method](method.md)) — see [Run surface](run.md).
 
-It is a recommended record section — a convention layered on the general model
-(see [Overview](overview.md)), not part of the core model.
+It is a recommended record section: a convention layered on the general model
+([Overview](overview.md)), not part of L0–L2.
 
-It is designed for training curves, validation scores, performance counters, diagnostics, and other
-run-local values that are useful while a record is being produced. The convention follows Molexp's
-run-local metrics stream while staying backend-neutral.
+**Not the same as observables.** Scientific results that are part of the
+interpreted chemistry/physics payload belong under [Observables](observables.md).
+Do not put training loss only under `observables` solely because it is numeric.
+Do not put published scientific series only under `metrics`.
 
-**Observables vs metrics.** Use [Observables](observables.md) for scientific
-quantities that are part of the *interpreted* record (e.g. a published RDF).
-Use `metrics` for run-local monitoring (loss, learning rate, wall time). Do not
-store training loss only under `observables` solely because it is numeric.
+## Logical model
 
-## Structure
+`metrics` is a **dense series catalog** — named series of points, not a
+columnar L1 table and not a nested `records/<id>/` tree.
 
-```text
-metrics
-\-- records
-|   \-- <record_id>
-|       +-- type: String[]
-|       +-- key: String[]
-|       +-- (step: Float[])
-|       +-- wall_time: String[]
-|       +-- value: <metric-value>
-|       +-- (tags)
-|       \-- ...
-\-- (index)
-    +-- line_count: Integer[]
-    +-- series_count: Integer[]
-    \-- series
-        \-- <key>
-            +-- type: String[]
-            +-- count: Integer[]
-            +-- (latest_step: Float[])
-            +-- (latest_timestamp: String[])
-            +-- (latest_value)
-```
+Each **logical event** (for live append and interchange dialects) has:
 
-The logical fields are `type`, `key`, `step`, `wall_time`, `value`, and `tags`.
+| Logical field | Required | Meaning |
+|---------------|----------|---------|
+| `type` | yes | Metric type (`scalar`, `histogram`, …) |
+| `key` | yes | Stable slash-separated series name |
+| `wall_time` | yes | ISO-8601 timestamp string |
+| `value` | yes | Payload; shape depends on `type` |
+| `step` | no | Finite number (training / sim step) |
+| `tags` | no | JSON object of free-form tags |
 
-## JSONL reference binding (append path)
+Rules:
 
-The **authoritative on-disk binding for live metrics** is append-only **JSONL**,
-not Zarr. High-frequency writers (training steps, MD monitors) MUST append one
-JSON object per line. Chunked array stores (including Zarr) are a poor fit for
-per-step scalar append: they force chunk realignment, metadata churn, and make
-crash recovery harder than a line-oriented log.
+- `key` MUST be a non-empty string.
+- `step`, if present, MUST be a finite number.
+- Live append is ordered: writers MUST NOT mutate or delete historical events
+  in the WAL.
+- The **closed source of truth** for curves is the **dense Zarr binding**
+  (per-series arrays), not the WAL.
 
-### Physical layout
+Foreign dialects (event JSONL, CSV, LAMMPS thermo, TensorBoard, …) are
+**equal sources**. Hosts normalize them into this model; they are not alternate
+SoTs.
+
+## Physical binding (reference)
+
+Full root rules: [Storage](storage.md).
+
+### Dense Zarr SoT (closed / densified)
+
+Under the record (or host run) root:
 
 ```text
 metrics/
-├── metrics.jsonl    # authoritative stream (one metric record per line)
-└── index.json       # optional, derived summary (rebuildable)
+  zarr/                    # Zarr V3 store (host layout) OR metrics/ group arrays
+    zarr.json
+    series/
+      <safe_name>/         # float64 values [n]
+      <safe_name>__steps/  # optional float64 [n]
+      <safe_name>__wall/   # optional float64 unix times [n]
 ```
 
-When the MolRec package is the openable record root, those paths are
-`<record-root>/metrics/metrics.jsonl` and `<record-root>/metrics/index.json`.
-A host that uses the record root as its run directory (e.g. molexp) may keep
-the same relative paths under the run dir.
+Store root attributes (catalog):
 
-### Compact field names
+| Attribute | Meaning |
+|-----------|---------|
+| `format_name` | `molmetrics` |
+| `binding` | `zarr-v3` |
+| `version` | integer schema of this catalog (starts at **1**) |
+| `series` | map of original key → `{type, count, array, steps_array?, wall_array?, …}` |
+| `series_count` | number of keys |
+| `point_count` | total scalar points |
 
-JSONL writers use the compact keys (shared with molexp):
+Consumers that need the curve **MUST** read the dense Zarr arrays when the
+store exists.
 
-| Logical field | Compact field |
-|---------------|---------------|
+On a pure MolRec record root that *is* the Zarr V3 package, series arrays MAY
+live directly under the `metrics/` group (same catalog attrs on that group)
+instead of a nested `metrics/zarr/` store. Hosts that are not full Zarr roots
+(e.g. molexp Run directories) use the nested `metrics/zarr/` store.
+
+### Live WAL (append-only text)
+
+High-frequency append is a poor fit for per-step Zarr chunk realignment. Live
+writes use a plain UTF-8 **JSONL WAL** beside the dense store:
+
+```text
+metrics/metrics.jsonl
+```
+
+- One JSON object per line, terminated by `\n`
+- omit keys whose value would be JSON `null`
+- writers MUST NOT rewrite or delete historical lines
+- readers MUST skip blank lines; malformed lines SHOULD be counted and skipped
+- **not** the closed SoT: on flush / close, writers densify into Zarr
+
+Compact field names (WAL dialect only):
+
+| Logical field | Compact key |
+|---------------|-------------|
 | `type` | `t` |
 | `key` | `k` |
 | `step` | `s` |
@@ -79,78 +106,25 @@ JSONL writers use the compact keys (shared with molexp):
 | `value` | `v` |
 | `tags` | `tags` |
 
-Example line:
+Example lines:
 
 ```json
-{"t":"scalar","k":"train/loss","s":120,"w":"2026-08-04T12:00:00","v":0.42}
+{"t":"scalar","k":"train/loss","s":1,"w":"2026-08-04T00:00:01+00:00","v":0.5}
+{"t":"scalar","k":"train/loss","s":2,"w":"2026-08-04T00:00:02+00:00","v":0.25}
 ```
 
-Encoding rules:
+### Closed summary vs dense store vs WAL
 
-- UTF-8 text, one JSON object per line, terminated by `\n`
-- omit keys whose value would be JSON `null` (optional fields may be absent)
-- writers MUST NOT rewrite or delete historical lines
-- readers MUST skip blank lines; malformed lines SHOULD be counted and skipped
-- `metrics.jsonl` is the source of truth; `index.json` is never authoritative
+| Artifact | Authoritative for curves? | When |
+|----------|---------------------------|------|
+| `metrics/zarr/` (or `metrics/` series arrays) | **Yes** when present | After densify / close |
+| `metrics/metrics.jsonl` | Live only; fallback if no dense store | During a run; pre-flush |
+| Group attributes summary only | No — listing aid | Optional |
 
-### Derived index
-
-`metrics/index.json` (when present) is a rebuildable summary. Recommended shape:
-
-```json
-{
-  "line_count": 3,
-  "series_count": 2,
-  "series": {
-    "train/loss": {
-      "type": "scalar",
-      "count": 2,
-      "latest_step": 2,
-      "latest_timestamp": "2026-08-04T12:00:01"
-    }
-  }
-}
-```
-
-Writers MAY rebuild the index on flush / close rather than on every append.
-
-### Relationship to Zarr / hybrid roots
-
-- **Live append** → JSONL under `metrics/` as above.
-- **Closed snapshot** (optional): a pure Zarr aggregate MAY store a small
-  metrics *summary* as group attributes for tooling that only opens Zarr.
-  That summary is not a substitute for the stream; consumers that need the
-  curve MUST read `metrics.jsonl` when it exists.
-- A single record root MAY be **hybrid**: frame / trajectory / large arrays in
-  Zarr groups, and `metrics/` as a filesystem JSONL sibling section.
-
-See [Record](record.md) (backend binding) and [Run surface](run.md).
-
-## Metric records
-
-Every metric record must include:
-
-- `type`
-- `key`
-- `wall_time`
-- `value`
-
-Optional fields:
-
-- `step`
-- `tags`
-
-Rules:
-
-- `key` must be a non-empty string.
-- `step`, if present, must be a finite number.
-- `wall_time` should be an ISO-8601 timestamp string.
-- `tags`, if present, must be a JSON-compatible object.
-- records are append-oriented; writers should not mutate historical records.
+There is **no** first-class `metrics/index.json` in the reference binding;
+hosts MAY keep a rebuildable listing cache.
 
 ## Metric types
-
-MolRec reserves the Molexp-compatible type vocabulary:
 
 | Type | Value contract |
 |------|----------------|
@@ -160,61 +134,34 @@ MolRec reserves the Molexp-compatible type vocabulary:
 | `image_ref` | object with `path` string and optional `caption` |
 | `json` | any JSON-compatible value |
 
-Custom metric types are allowed when a module declares their parse rules.
+Scalar series densify to float64 arrays. Non-scalar types MAY remain WAL-only
+until a denser encoding is declared in `meta.modules`.
 
 ## Key namespace
 
-Metric keys should be stable slash-separated names.
+Keys should be stable slash-separated names. Recommended namespaces (MolNex
+`TrainState` convention):
 
-Recommended namespaces follow the MolNex `TrainState` convention:
+| Prefix | Use |
+|--------|-----|
+| `train/*` | training metrics (`train/loss`) |
+| `eval/*` | validation (`eval/MAE`) |
+| `test/*` | held-out test |
+| `performance/*` | runtime counters (`performance/step_per_second`) |
+| `gpu/*` | device counters (`gpu/alloc_gib`) |
 
-- `train/*` for training metrics such as `train/loss`
-- `eval/*` for validation or evaluation metrics such as `eval/MAE`
-- `test/*` for held-out test metrics
-- `performance/*` for runtime counters such as `performance/step_per_second`
-- `gpu/*` for device counters such as `gpu/alloc_gib`
-
-Keys are case-sensitive. Writers should not use display labels as keys; labels can be stored in
-metadata or tags.
-
-## Index
-
-`metrics/index` is optional and derived.
-
-It may summarize the metric stream for fast listing:
-
-- total record count
-- number of distinct series
-- per-key type
-- per-key count
-- latest step
-- latest timestamp
-- latest scalar value when applicable
-
-Readers must not treat an index as authoritative if the underlying metric records are available.
-Backends may rebuild the index from the record stream.
+Keys are case-sensitive. Writers should not use display labels as keys; put
+labels in tags or surrounding metadata.
 
 ## Relationship to status
 
-Metrics capture values over time. Status captures the current lifecycle and progress state.
-
-Examples:
-
-- `metrics` records `train/loss` at steps 1, 2, 3, ...
-- `status/global_step` stores the current step.
-- `metrics` records `performance/step_per_second`.
-- `status/state` stores whether execution is `running`, `succeeded`, or `failed`.
-
-## Relationship to observables
-
-If a value is needed to interpret the scientific record, store it in `observables`.
-
-If the same value is also useful for live monitoring, a writer may mirror it into `metrics`, but the
-observable remains the authoritative scientific value.
+| Section | Role |
+|---------|------|
+| `metrics` | values over time (many points) — dense Zarr + optional WAL |
+| `status` | current lifecycle / progress snapshot — **Zarr attributes** |
 
 ## Rule
 
-The core rule is:
-
-> `metrics` is an append-oriented measurement stream keyed by stable names; it is not a replacement
-> for `observables`.
+> `metrics` is a dense series catalog (Zarr arrays) with an optional JSONL WAL
+> for live append; foreign logs are dialects, not alternate SoTs. It is not a
+> replacement for `observables`.

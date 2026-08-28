@@ -1,0 +1,24 @@
+{
+  "description": "One named conformance failure.\n\n``kind`` is drawn from a closed vocabulary so expected-violation cases can\nbe compared exactly, and so implementations in other languages can report\nthe same names.",
+  "properties": {
+    "detail": {
+      "default": "",
+      "title": "Detail",
+      "type": "string"
+    },
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "path": {
+      "default": "",
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "Violation",
+  "type": "object"
+}

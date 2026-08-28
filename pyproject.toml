@@ -1,41 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "molrec-spec-tests"
+name = "molrec"
 version = "0.1.0"
-requires-python = ">=3.9"
-dependencies = ["molcrafts-molrs"]
+description = "The MolCrafts record contract: models, conformance suite, and benchmarks."
+requires-python = ">=3.12"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "MolCrafts" }]
+dependencies = [
+  "numpy>=1.26",
+  "pydantic>=2.7",
+]
 
-[tool.pytest.ini_options]
-testpaths = ["src/molrec/tests"]
-
+# Backends are optional: a consumer that only needs the models and the
+# conformance harness must not be forced to install every store backend.
 [project.optional-dependencies]
+zarr = ["zarr>=3.0"]
 dev = [
-  "tox>=4.23",
   "pytest>=8.0",
   "ruff>=0.11",
-  "molcrafts-molrs",
+  "zarr>=3.0",
 ]
 
-[tool.tox]
-requires = ["tox>=4.23"]
-env_list = ["lint", "py"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/molrec"]
 
-[tool.tox.env.lint]
-description = "CI lint"
-skip_install = true
-base_python = ["python3.12"]
-deps = ["ruff>=0.11"]
-commands = [
-  # Spec-test tree predates a full ruff clean-up; format gate only for now.
-  ["ruff", "format", "--check", "."],
-]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
-[tool.tox.env.py]
-description = "CI test"
-skip_install = false
-package = "wheel"
-extras = ["dev"]
-base_python = ["python3.12"]
-deps = ["pytest>=8.0", "molcrafts-molrs"]
-commands = [
-  ["{envpython}", "-m", "pytest", "-q"],
-]
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

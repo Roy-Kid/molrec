@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import molrs
+import molrs.ff
+import molrs.io
 
 
 class TestMMFFForceField:
     def test_roundtrip(self, tmp_zarr_path):
-        mol = molrs.parse_smiles("CCO").to_atomistic()
-        typifier = molrs.MMFFTypifier()
-        typed_frame = typifier.typify(mol)
+        mol = molrs.io.SmilesIR("CCO").to_atomistic()
+        typifier = molrs.ff.MMFF94Typifier()
+        typed_frame = typifier.typify(mol).to_frame()
         ff = typifier.forcefield()
 
         record = molrs.MolRec()
@@ -20,9 +22,9 @@ class TestMMFFForceField:
         assert loaded.method["classical"]["force_field"]["name"] == ff.name
 
     def test_meta_preserved(self, tmp_zarr_path):
-        mol = molrs.parse_smiles("CCO").to_atomistic()
-        typifier = molrs.MMFFTypifier()
-        typed_frame = typifier.typify(mol)
+        mol = molrs.io.SmilesIR("CCO").to_atomistic()
+        typifier = molrs.ff.MMFF94Typifier()
+        typed_frame = typifier.typify(mol).to_frame()
         ff = typifier.forcefield()
 
         record = molrs.MolRec()

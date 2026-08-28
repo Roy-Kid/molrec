@@ -2,147 +2,103 @@
 
 ## Purpose
 
-`method` stores the scientific context needed to interpret a MolRec record. It is
-part of the **run surface** (with [Status](status.md) and [Metrics](metrics.md))
-— see [Run surface](run.md).
+`method` stores the **scientific / training context** needed to interpret a
+record. It is part of the **run surface** (with [Status](status.md) and
+[Metrics](metrics.md)) — see [Run surface](run.md).
 
-It is a recommended record section — a convention layered on the general model
-(see [Overview](overview.md)).
+It is a recommended record section: a convention layered on the general model
+([Overview](overview.md)).
 
-It answers questions such as:
+It answers:
 
 - what class of method produced this record
 - which engine wrote it
 - which force field, model, or solver was used
-- which important settings define the calculation
+- which settings define the calculation
 
-`method` is descriptive metadata. It is not the place for result arrays.
+`method` is descriptive metadata. Result arrays stay in `frame`, `trajectory`,
+or `observables`. System-defining parameter tables live under
+`system/parameters` (see [System](system.md)), not as a root `parameters/` or
+`forcefield/` section.
+
+Physical form: **Zarr group attributes** on `method/` — see
+[Storage](storage.md). The logical document is one JSON object.
 
 ## Structure
 
 ```text
 method
-+-- type: String[]
-+-- description: String[]
-+-- engine
-|   +-- name: String[]
-|   \-- (version: String[])
-+-- (order: String[nstage])
++-- type: string                      # required — selects parse rules
++-- description: string               # required
++-- engine                            # required
+|   +-- name: string
+|   \-- (version: string)
++-- (order: string[])                 # stage ids for workflow type
 \-- (stages)
-    +-- <stage_id>
-    |   +-- type: String[]
-    |   +-- description: String[]
-    |   \-- ...
-    \-- ...
+    \-- <stage_id>
+        +-- type: string
+        +-- description: string
+        \-- ...
 ```
 
-`method/type` selects the parse rules for the subtree.
+Field types are plain JSON.
 
-MolRec 0.1 ships with standard types such as `classical`, `ml`, `electronic_structure`, and
-`workflow`, but `method` is not restricted to a fixed closed vocabulary.
+## Typed schemas
 
-Any custom method type is valid if its parse rules are documented in a module declared under
-`meta/modules`.
-
-## Typed method schemas
-
-The interpretation of `method` is driven by `type`, not by hard-coded subtree names alone.
+Interpretation is driven by `method.type`, not by hard-coded subtree names alone.
 
 Rules:
 
-- `method/type` is required
-- `method/description` is required
-- `method/engine/name` is required
-- custom method types must define their parse rules in a module declared under `meta/modules`
-- result arrays stay in `frame`, `trajectory`, or `observables`
+1. `method.type` is required when the section exists.
+2. `method.description` is required.
+3. `method.engine.name` is required.
+4. Custom method types MUST document parse rules under `meta.modules`.
+5. Result arrays stay in `frame`, `trajectory`, or `observables`.
 
-## Standard types
+Standard types (open vocabulary; not a closed enum):
 
-### `classical`
+| Type | Typical content |
+|------|-----------------|
+| `classical` | force field, bonded/nonbonded choices, integrator, thermostat, barostat, cutoffs |
+| `ml` | model family, checkpoint id, representation, inference precision, training provenance |
+| `electronic_structure` | HF/DFT/MP2 family, functional, basis, ECP, SCF, spin, thresholds |
+| `workflow` | multi-stage composite (see below) |
 
-Typical content includes:
-
-- force field identity
-- bonded and nonbonded model choices
-- integrator
-- thermostat
-- barostat
-- cutoff and long-range settings
-
-### `ml`
-
-Typical content includes:
-
-- model family
-- checkpoint or model identifier
-- representation or descriptor family
-- inference precision
-- training provenance if needed for interpretation
-
-### `electronic_structure`
-
-Typical content includes:
-
-- method family such as HF, DFT, MP2
-- functional
-- basis set
-- pseudopotential or effective core potential
-- SCF settings
-- spin treatment
-- convergence thresholds
+Any custom type is valid if its parse rules are declared in a module under
+`meta.modules`.
 
 ### `workflow`
 
-`workflow` is used for multi-stage or composite workflows.
+Required when `type = "workflow"`:
 
-Required structure:
+- `method.order` — ordered list of stage ids
+- `method.stages.<stage_id>.type` — each stage is itself a typed method block
 
-- `method/type = "workflow"`
-- `method/order`
-- `method/stages/<stage_id>/type`
-
-Typical content includes:
-
-- stage names
-- stage order
-- stage-specific engines
-- stage-specific methods
-- stage-specific inputs and outputs
-- stage-specific targets such as `/frame/atoms` or `/observables/free_energy`
-
-Each stage is itself a typed method block and may use any standard or custom type.
-
-### Custom method types
-
-MolRec allows custom method types such as:
-
-- QM/MM
-- enhanced sampling variants
-- active-learning loops
-- multiscale workflows
-
-The only requirement is that the `type` be declared and its parse rules be documented in a module
-declared under `meta/modules`.
+Typical content: stage names and order, per-stage engines/methods, inputs and
+outputs, targets such as `/frame/atoms` or `/observables/free_energy`.
 
 ## Example
 
-```text
-method
-+-- type: "workflow"
-+-- description: "Geometry relaxation followed by single-point DFT"
-+-- engine
-|   \-- name: "MolFlow"
-+-- order: ["relax", "single_point"]
-\-- stages
-    +-- relax
-    |   +-- type: "classical"
-    |   +-- description: "Pre-relaxation with a classical force field"
-    |   \-- force_field: "GAFF"
-    \-- single_point
-        +-- type: "electronic_structure"
-        +-- description: "Single-point DFT evaluation"
-        +-- family: "DFT"
-        +-- functional: "PBE"
-        +-- basis: "def2-SVP"
-        \-- spin: "restricted"
+```json
+{
+  "type": "workflow",
+  "description": "Geometry relaxation followed by single-point DFT",
+  "engine": { "name": "MolFlow" },
+  "order": ["relax", "single_point"],
+  "stages": {
+    "relax": {
+      "type": "classical",
+      "description": "Pre-relaxation with a classical force field",
+      "force_field": "GAFF"
+    },
+    "single_point": {
+      "type": "electronic_structure",
+      "description": "Single-point DFT evaluation",
+      "family": "DFT",
+      "functional": "PBE",
+      "basis": "def2-SVP",
+      "spin": "restricted"
+    }
+  }
+}
 ```

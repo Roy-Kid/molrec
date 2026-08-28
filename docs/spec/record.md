@@ -33,6 +33,8 @@ model parameters live under `system/parameters`. How a job is run lives under
 Section names above are **conventional record keys**. Unknown sibling sections
 MUST be preserved by readers that do not understand them.
 
+Physical forms (JSON vs Zarr vs JSONL) for each section: [Storage](storage.md).
+
 ## Versioning
 
 `meta` **MUST** carry (for writers of new records):
@@ -40,11 +42,14 @@ MUST be preserved by readers that do not understand them.
 | Key | Meaning |
 |-----|---------|
 | `record_schema_version` | **Sole** schema version integer for the whole record (layout + L1 encoding). Starts at **1**. |
-| `format_name` | Optional binding id when using the Zarr reference layout: `molrec` — never a product name like `molpy-zarr` |
+| `format_name` | Optional binding id when using the reference layout: `molrec` — never a product name like `molpy-zarr` |
 
-There is **no** parallel `frame_schema_version` in the contract. New writers
-MUST NOT emit it. Readers of the new contract do **not** implement
-backward-compatible dual-key decoding; migrate old files offline.
+There is **no** parallel `frame_schema_version` and **no** layout version key
+named `meta.version`. New writers MUST NOT emit retired keys. Readers of the
+current contract do **not** implement backward-compatible dual-key decoding;
+migrate old files offline.
+
+Full meta field table: [Meta](meta.md).
 
 ## Minimum record shapes
 
@@ -78,28 +83,30 @@ Record sections are built from the same containers as the rest of MolRec:
 - Domain meaning of block names — [Conventions](conventions.md)
 
 A `frame/` section is an L1 Frame. A `system/` section is a conventional tree
-that may embed Blocks without time-dependent coordinates.
+that may embed Blocks without time-dependent coordinates. Document sections
+(`meta`, `status`, `method`) are JSON objects stored as **Zarr group
+attributes**. Live metrics use an append-only **JSONL text buffer** under the
+same root — see [Storage](storage.md).
 
 ## Backend binding (non-normative)
 
-The reference storage binding for **array sections** (frame / trajectory /
-system / large observables) is **Zarr V3**, implemented in
-[molrs](https://github.com/MolCrafts/molrs). The specification does not require
-Zarr; any backend that preserves section semantics is conforming.
+Summary — full chapter: [Storage](storage.md).
 
-**Metrics are different.** Append-oriented run measurements use a **JSONL**
-reference binding under `metrics/metrics.jsonl` (see [Metrics](metrics.md)).
-Do not use Zarr chunk append for the live metrics stream. A record root may be
-**hybrid**: Zarr groups for scientific arrays plus a filesystem JSONL metrics
-section (and small JSON files for `meta` / `status` / `method` when not stored
-as Zarr attributes).
+| Kind | Sections | Reference form |
+|------|----------|----------------|
+| Zarr root | whole package | One openable Zarr V3 hierarchy |
+| Arrays | `frame`, `system`, `trajectory`, large `observables` | Zarr groups + arrays |
+| Documents | `meta`, `status`, `method`, closed metrics summary | Zarr **group attributes** |
+| Dense series | closed `metrics` | Zarr arrays under `metrics/` (+ catalog attrs) |
+| Live WAL | live `metrics` | `metrics/metrics.jsonl` (UTF-8 text; densify on flush) |
 
-Current molrs public Zarr helpers primarily persist **frame sequences** and
-closed record aggregates. Live training metrics are written by higher layers
-(e.g. molnex provisional writer → later molpy) against the JSONL binding.
+There is **no** reference layout of loose `meta.json` / `status.json` beside
+the store. molrs writes document sections as attributes; run hosts append the
+metrics buffer.
 
 ## See also
 
 - [Overview](overview.md) — L0–L4 layering
+- [Storage](storage.md) — Zarr root + JSONL buffer
 - [System](system.md) — system definition section
 - [Run surface](run.md) — training / job logs as records

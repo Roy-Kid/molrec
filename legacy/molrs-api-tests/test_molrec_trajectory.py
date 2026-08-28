@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import molrs
+import molrs.ff
+import molrs.io
 import numpy as np
 
 
 class TestTrajectoryFromPDB:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frame0 = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
-        frame1 = molrs.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame0 = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
+        frame1 = molrs.io.read_pdb(str(tests_data / "pdb" / "water.pdb"))
         trajectory = molrs.Trajectory(
             [frame0, frame1],
             step=np.array([0, 1], dtype=np.int64),
@@ -32,9 +34,7 @@ class TestTrajectoryFromPDB:
 
 class TestTrajectoryFromLAMMPS:
     def test_roundtrip(self, tests_data, tmp_zarr_path):
-        frames = molrs.read_lammps_traj(
-            str(tests_data / "lammps" / "wrapped.lammpstrj")
-        )
+        frames = molrs.io.read_lammps_trajectory(str(tests_data / "lammps" / "wrapped.lammpstrj"))
         record = molrs.MolRec()
         record.set_frame(frames[0])
         for frame in frames:

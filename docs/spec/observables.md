@@ -20,20 +20,22 @@ Each observable is a pair:
 When the section is present the pairing is mandatory: observable data are never
 standalone.
 
+Physical form: **Zarr array groups** with per-name semantic **attributes** —
+see [Storage](storage.md).
+
 ## Structure
 
 ```text
 observables
-\-- meta
-|   \-- <name>
-|       +-- kind: String[]            # "scalar" | "vector"
-|       +-- description: String[]
-|       +-- time_dependent: Bool[]
-|       +-- (unit: String[])
-|       +-- (axes: String[A])
-|       \-- (target: String[])
-\-- <name>: <dtype>[...]
-\-- ...
+├── meta/
+│   └── <name>/                 # semantic metadata (JSON attrs in Zarr binding)
+│       +-- kind: string        # "scalar" | "vector"
+│       +-- description: string
+│       +-- time_dependent: bool
+│       +-- (unit: string)
+│       +-- (axes: string[])    # names of trailing axes
+│       \-- (target: string)    # e.g. "/frame/atoms"
+└── <name>: <dtype>[...]        # data column / array
 ```
 
 ## Kinds

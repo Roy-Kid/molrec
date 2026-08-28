@@ -9,6 +9,7 @@ It defines:
 1. A minimal, fully general **data model** (containers with no privileged field names).
 2. A **Record** root — the unit of interchange across tools.
 3. Recommended **conventions** (domain section names and column names).
+4. A **reference storage binding** (one Zarr root + metrics JSONL buffer).
 
 It does **not** define a product class named `MolStore`, `SimStore`, or similar.
 Implementations may provide record I/O APIs; the specification names **layout and
@@ -27,7 +28,9 @@ data its authors never anticipated.
 | L1 | Containers | Column · Block · Frame · Box | Normative |
 | L2 | Record | Root sections, versioning, minimum shapes | Normative |
 | L3 | Conventions | `system`, `trajectory`, `status`, `metrics`, … | Recommended |
-| L4 | Backend binding | Arrays: Zarr V3 in molrs; metrics stream: JSONL | Reference only |
+| L4 | Backend binding | Zarr V3 root (arrays + document attrs) · metrics JSONL buffer | Reference only |
+
+Details of L4: [Storage](storage.md).
 
 ## The model (L1)
 
@@ -98,6 +101,7 @@ the canonical entity remains the frame. See [Trajectory](trajectory.md).
   — are normative.
 - **L3** — [Conventions](conventions.md), [System](system.md), [Run surface](run.md),
   and the section chapters — are recommended so tools interoperate.
+- **L4** — [Storage](storage.md) — is the reference binding only.
 
 A conforming reader must traverse the model. Interpreting an unknown convention
 is optional, but unknown blocks and columns MUST be preserved.
@@ -140,19 +144,29 @@ Training / job logs: see [Run surface](run.md).
 ## Backend binding (L4)
 
 The specification does not mandate a storage engine. The **reference** binding
-is Zarr V3 in [molrs](https://github.com/MolCrafts/molrs). Other backends may
-implement the same section semantics.
+is documented in [Storage](storage.md):
 
-MolRec never names a required product API `MolStore` or `SimStore`.
-The cell is **`Box` / `box` only** in the contract. The sole schema version key
-is **`record_schema_version`** (starts at 1). Reference I/O is implemented in
-**molrs first**, then consumed by molpy via re-export — never a second layout
-called MolStore. **No backward-compatible dual reads** of retired keys or
-layouts; migrate offline.
+| Content | Reference form |
+|---------|----------------|
+| Openable package | **One Zarr V3 root** |
+| Dense L1 tables (`frame`, `system`, `trajectory`, large observables) | Zarr array groups (molrs) |
+| Documents (`meta`, `status`, `method`) | **Zarr group attributes** (not sibling `.json` files) |
+| Closed metrics | **Dense Zarr series** under `metrics/` (catalog attrs + arrays) |
+| Live metrics WAL | **Append-only JSONL** `metrics/metrics.jsonl` (densify on flush) |
+
+Contract rules that travel with L4:
+
+- No product API name `MolStore` / `SimStore`.
+- Cell name is **`Box` / `box` only**.
+- Sole schema version key: **`record_schema_version`** (starts at 1).
+- Reference I/O lands in **molrs first**; consumers re-export — never a second
+  layout brand.
+- **No backward-compatible dual reads** of retired keys; migrate offline.
 
 ## Normative invariants
 
-The following invariants define MolRec 0.3:
+The following invariants define the current MolRec contract
+(`record_schema_version = 1`):
 
 1. L1 has exactly three containers — Column, Block, Frame — with no privileged
    field names.
@@ -169,3 +183,5 @@ The following invariants define MolRec 0.3:
    recognize.
 9. A Record requires `meta` and at least one of `frame`, `system`, or `status`.
 10. Instantaneous Cartesian coordinates are not required content of `system/`.
+11. Live metrics use the JSONL text buffer when present; Zarr metrics attributes
+    are summary-only.

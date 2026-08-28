@@ -1,0 +1,39 @@
+"""The generated schema tree is the normative artifact, so it must not drift.
+
+If regeneration produces a diff, the committed schemas no longer describe the
+models -- and a Julia or Go implementer reading them would be implementing
+something that no longer exists.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from molrec.schema_export import PUBLISHED, export
+
+REPO = Path(__file__).resolve().parents[1]
+SCHEMA = REPO / "schema"
+
+
+def test_regenerating_matches_what_is_committed(tmp_path):
+    for generated in export(tmp_path):
+        committed = SCHEMA / generated.relative_to(tmp_path)
+        assert committed.exists(), f"{committed} is missing -- run python -m molrec.schema_export"
+        assert committed.read_text() == generated.read_text(), (
+            f"{committed} is stale -- run python -m molrec.schema_export"
+        )
+
+
+def test_every_published_model_lands_on_disk(tmp_path):
+    expected = sum(len(models) for models in PUBLISHED.values())
+    assert len(export(tmp_path)) == expected
+
+
+def test_committed_schemas_are_valid_json_objects():
+    files = list(SCHEMA.rglob("*.schema.json"))
+    assert files, "nothing was exported"
+    for path in files:
+        document = json.loads(path.read_text())
+        assert document["type"] == "object"
+        assert "properties" in document

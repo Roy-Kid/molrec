@@ -56,6 +56,10 @@ model — the packed arrays still mean an ordered list of frames. A block whose
 entity set changes over time may add a per-step `count` and a `mask` array marking
 active entities; fixed-composition blocks need neither.
 
+Reference array binding (Zarr groups; list-of-frames vs packed): [Storage](storage.md).
+molrs currently writes list-of-frames (`trajectory/frames/<i>/`); packed is an
+allowed optimisation over the same logical model.
+
 ## Scope
 
 Evolving frame-like state belongs in `trajectory`. Reduced scientific statistics
